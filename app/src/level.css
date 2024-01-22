@@ -1,3 +1,10 @@
-.level h1 {
+@font-face {
+    font-family: "Monti";
+    src: 
+        url("MontessoriGardenScript.woff") format("woff");
+}
+
+.level {
     color: var(--purple);
+    font-family: "Monti", Arial, Helvetica, sans-serif;
 }

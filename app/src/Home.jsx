@@ -9,7 +9,7 @@ const Home = ({toLevel}) => {
         <div className="title-logo">
             <img src={montiLogo} id='montiLogo' alt="logo"/>
         </div>
-        <motion.button  
+        <motion.button
             whileTap={{ scale: 0.9, filter: 'brightness(50%)'}}
             transition={{duration: .1}}
             className="startButton bree"
