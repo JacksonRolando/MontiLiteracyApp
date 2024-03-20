@@ -7,4 +7,23 @@
 .level {
     color: var(--purple);
     font-family: "Monti", Arial, Helvetica, sans-serif;
+    touch-action: none;
+    width: 100%;
+    position: relative;
+}
+
+canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.centered-and-cropped{
+    position: absolute;
+    height: 65vh;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    filter: invert(100%) sepia(40%) saturate(4107%) hue-rotate(319deg) brightness(102%) contrast(92%);
 }
