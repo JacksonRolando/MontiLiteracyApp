@@ -69,24 +69,27 @@ const checkDrawnPoint = (prevD2ToPoint, nextPoint, pointToCheck, scaleFactor) =>
     }
 }
 
-const advancePoint = (tracePointIndRef, traceStrokeIndRef, pointsLen) => {
+const advanceLetter = (letterInd, setLetterInd, context, traceStrokeInd, tracePointInd) => {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    traceStrokeInd.current = 0
+    tracePointInd.current = 0
+    setLetterInd(letterInd + 1)
+}
+
+const advancePoint = (tracePointIndRef, traceStrokeIndRef, transformedStrokes) => {
     tracePointIndRef.current = tracePointIndRef.current + 1
-    if(tracePointIndRef.current >= pointsLen) {
-        tracePointIndRef = 0
+    if(tracePointIndRef.current >= transformedStrokes[traceStrokeIndRef.current].length) {
+        tracePointIndRef.current = 0
         traceStrokeIndRef.current = tracePointIndRef.current + 1
     }
-    console.log('advanced!');
 }
 
 const Level = ({ back }) => {
-    const [letter, setLetter] = useState('c');
-    const [letterInd, setLetterInd] = useState(0);
+    const [letterInd, setLetterInd] = useState(1);
     const [isDrawing, setIsDrawing] = useState(false);
     const [transformedStrokes, setTransformedStrokes] = useState(null)
     const tracePointInd = useRef(null)
     const traceStrokeInd = useRef(null)
-    // const [tracePointInd, setTracePointInd] = useState(null)
-    // const [traceStrokeInd, setTraceStrokeInd] = useState(null)
     const context = useRef(null);
     const imgScale = useRef(null)
     const letterHeight = useRef(null)
@@ -94,13 +97,17 @@ const Level = ({ back }) => {
     const prevD2ToPoint = useRef(null)
 
     const loadImg = (event) => {
+        console.log("load image image");
         const letterImg = event.target
         const scaleFactor = window.innerHeight * .001
         imgScale.current = scaleFactor
+        console.log(letterImg.height);
         letterImg.height = scaleFactor * letterImg.height
         letterHeight.current = letterImg.height
+        console.log(letterImg.height);
 
-        let points = tracePoints[letter]
+
+        let points = tracePoints[letters[letterInd]]
 
         let pointsScale = [letterImg.width / (points.dims[0]), letterImg.height / (points.dims[1])]
 
@@ -149,17 +156,27 @@ const Level = ({ back }) => {
             context.current.stroke();
 
             lastDrawnPoint.current = ({ x, y });
-            let checkResult = checkDrawnPoint(prevD2ToPoint.current, transformedStrokes[traceStrokeInd.current][tracePointInd.current + 1], lastDrawnPoint.current, imgScale.current)
-            prevD2ToPoint.current = checkResult.dist
-            if(checkResult.hit) {
-                prevD2ToPoint.current = (letterHeight.current * 2) ** 2
-                advancePoint(tracePointInd, traceStrokeInd, transformedStrokes[traceStrokeInd.current].length)
-                if(traceStrokeInd >= transformedStrokes[traceStrokeInd.current].length){
-                    setLetterInd(letterInd + 1)
-                    setLetter(letterInd + 1)
-                }   
-                else {
+
+            if(tracePointInd.current + 1 < transformedStrokes[traceStrokeInd.current].length) {
+                let checkResult = checkDrawnPoint(prevD2ToPoint.current, transformedStrokes[traceStrokeInd.current][tracePointInd.current + 1], lastDrawnPoint.current, imgScale.current)
+                prevD2ToPoint.current = checkResult.dist
+
+                if(checkResult.hit) {
+                    prevD2ToPoint.current = (letterHeight.current * 2) ** 2
                     drawNextPoint(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
+                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes)
+                    if(traceStrokeInd >= transformedStrokes[traceStrokeInd.current].length){
+                        advanceLetter(letterInd, setLetterInd, context.current)
+                    }   
+                    else {
+                        drawNextPoint(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
+                    }
+                }
+            } else {
+                if(traceStrokeInd.current + 1 >= transformedStrokes.length) {
+                    advanceLetter(letterInd, setLetterInd, context.current, traceStrokeInd, tracePointInd)
+                } else {
+                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes)
                 }
             }
         };
@@ -181,13 +198,9 @@ const Level = ({ back }) => {
         };
     }, [isDrawing, transformedStrokes]);
 
-    // useEffect(() => {
-    //     drawNextPoint(context, tracePointInd, traceStrokeInd, transformedStrokes, imgScale.current)
-    // }, [context, tracePointInd, traceStrokeInd, transformedStrokes])
-
     return (
         <div className="level">
-            <img className='centered-and-cropped' id='letterImage' src={`letters/${letter}.png`} onLoad={loadImg}/>
+            <img className='centered-and-cropped' id='letterImage' src={`letters/${letters[letterInd]}.png`} onLoad={loadImg}/>
             <canvas
                 id="canvas"
                 width={canvasWidth}
