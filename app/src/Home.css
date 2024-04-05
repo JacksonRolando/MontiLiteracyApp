@@ -1,7 +1,7 @@
 .home {
     display: flex;
     flex-direction: column;
-    height: 70%;
+    height: 80%;
     width: 25rem;
     max-height: 40rem;
     text-align: center;

@@ -21,7 +21,6 @@ canvas {
 
 .centered-and-cropped{
     position: absolute;
-    height: 65vh;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
