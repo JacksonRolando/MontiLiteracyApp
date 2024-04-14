@@ -2,12 +2,35 @@ import React, { useState, useEffect, useRef } from 'react';
 import './level.css';
 import trace_points from './trace_points';
 
-const letters = ['a', 'b', 'c']
+const letters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
 
 const tracePoints = {
     a: trace_points['a'],
     b: trace_points['b'],
     c: trace_points['c'],
+    d: trace_points['d'],
+    e: trace_points['e'],
+    f: trace_points['f'],
+    g: trace_points['g'],
+    h: trace_points['h'],
+    i: trace_points['i'],
+    j: trace_points['j'],
+    k: trace_points['k'],
+    l: trace_points['l'],
+    m: trace_points['m'],
+    n: trace_points['n'],
+    o: trace_points['o'],
+    p: trace_points['p'],
+    q: trace_points['q'],
+    r: trace_points['r'],
+    s: trace_points['s'],
+    t: trace_points['t'],
+    u: trace_points['u'],
+    v: trace_points['v'],
+    w: trace_points['w'],
+    x: trace_points['x'],
+    y: trace_points['y'],
+    z: trace_points['z'],
 };
 
 const TRACE_FUDGE_FACTOR = 23
@@ -85,7 +108,7 @@ const advancePoint = (tracePointIndRef, traceStrokeIndRef, transformedStrokes) =
 }
 
 const Level = ({ back }) => {
-    const [letterInd, setLetterInd] = useState(1);
+    const [letterInd, setLetterInd] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
     const [transformedStrokes, setTransformedStrokes] = useState(null)
     const tracePointInd = useRef(null)
@@ -101,10 +124,9 @@ const Level = ({ back }) => {
         const letterImg = event.target
         const scaleFactor = window.innerHeight * .001
         imgScale.current = scaleFactor
-        console.log(letterImg.height);
-        letterImg.height = scaleFactor * letterImg.height
+        console.log(letterImg.height, letterImg.naturalHeight);
+        letterImg.height = scaleFactor * letterImg.naturalHeight
         letterHeight.current = letterImg.height
-        console.log(letterImg.height);
 
 
         let points = tracePoints[letters[letterInd]]
