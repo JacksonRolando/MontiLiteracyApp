@@ -1,6 +1,12 @@
+@font-face {
+  font-family: "Monti";
+  src: 
+      url("MontessoriGardenScript.woff") format("woff");
+}
+
 body {
   padding: 0;
-  font-family: 'Monti-font';
+  font-family: 'Monti';
 }
 
 html, body {

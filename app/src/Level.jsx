@@ -1,40 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { React, useState, useEffect, useRef, useReducer } from 'react';
+import { motion } from 'framer-motion';
+
 import './level.css';
-import trace_points from './trace_points';
+import { levels, colorByLetter } from './utils/levelData'
 
-const letters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
+const TRACE_FUDGE_FACTOR = 40
+const HIT_FUDGE_FACTOR = 30
 
-const tracePoints = {
-    a: trace_points['a'],
-    b: trace_points['b'],
-    c: trace_points['c'],
-    d: trace_points['d'],
-    e: trace_points['e'],
-    f: trace_points['f'],
-    g: trace_points['g'],
-    h: trace_points['h'],
-    i: trace_points['i'],
-    j: trace_points['j'],
-    k: trace_points['k'],
-    l: trace_points['l'],
-    m: trace_points['m'],
-    n: trace_points['n'],
-    o: trace_points['o'],
-    p: trace_points['p'],
-    q: trace_points['q'],
-    r: trace_points['r'],
-    s: trace_points['s'],
-    t: trace_points['t'],
-    u: trace_points['u'],
-    v: trace_points['v'],
-    w: trace_points['w'],
-    x: trace_points['x'],
-    y: trace_points['y'],
-    z: trace_points['z'],
-};
-
-const TRACE_FUDGE_FACTOR = 23
-const HIT_FUDGE_FACTOR = 23
+const DRAW_LINE_WIDTH = 8
 
 const [canvasWidth, canvasHeight] = [window.innerWidth, window.innerHeight]
 
@@ -43,33 +16,25 @@ const transformStroke = (stroke, letterSize, pointsScale) => {
     const yMove = (canvasHeight - letterSize[1]) / 2
 
     const out = []
-    for(let point of stroke) {
+    for (let point of stroke) {
         out.push([pointsScale[0] * point[0] + xMove, -1 * pointsScale[1] * point[1] + yMove])
     }
     return out
 }
 
-const drawNextPoint = (context, tracePointIndex, traceStrokeIndex, transformStrokes, scaleFactor) => {
+const drawTarget = (context, tracePointIndex, traceStrokeIndex, transformStrokes, scaleFactor) => {
     context.fillStyle = "green";
     context.beginPath();
-    if(transformStrokes){
+    if (transformStrokes && transformStrokes[traceStrokeIndex]) {
         const tracePoint = transformStrokes[traceStrokeIndex][tracePointIndex]
         context.ellipse(tracePoint[0], tracePoint[1], 17 * scaleFactor, 17 * scaleFactor, 0, 0, Math.PI * 2);
         context.fill();
-
-        const nextTracePoint = (tracePointIndex + 1 < transformStrokes[traceStrokeIndex].length) ? transformStrokes[traceStrokeIndex][tracePointIndex + 1] : null
-        if(nextTracePoint) {
-            context.fillStyle = "red";
-            context.beginPath();
-            context.ellipse(nextTracePoint[0], nextTracePoint[1], 13 * scaleFactor / 2, 13 * scaleFactor / 2, 0, 0, Math.PI * 2);
-            context.fill();
-        }
     }
 }
 
 const checkDrawnPoint = (prevD2ToPoint, nextPoint, pointToCheck, scaleFactor) => {
     const dist = ((pointToCheck.x - nextPoint[0]) ** 2 + (pointToCheck.y - nextPoint[1]) ** 2)
-    if(dist < (HIT_FUDGE_FACTOR * scaleFactor) **2) {
+    if (dist < (HIT_FUDGE_FACTOR * scaleFactor) ** 2) {
         return {
             "good": true,
             "hit": true,
@@ -77,7 +42,7 @@ const checkDrawnPoint = (prevD2ToPoint, nextPoint, pointToCheck, scaleFactor) =>
         }
     }
 
-    if(Math.max(dist - (TRACE_FUDGE_FACTOR * scaleFactor) ** 2, 0) < prevD2ToPoint) {
+    if (Math.max(dist - (TRACE_FUDGE_FACTOR * scaleFactor) ** 2, 0) < prevD2ToPoint) {
         return {
             "good": true,
             "hit": false,
@@ -92,24 +57,39 @@ const checkDrawnPoint = (prevD2ToPoint, nextPoint, pointToCheck, scaleFactor) =>
     }
 }
 
-const advanceLetter = (letterInd, setLetterInd, context, traceStrokeInd, tracePointInd) => {
+const advanceLetter = (letterInd, setLetterInd, context, traceStrokeInd, tracePointInd, resetPrevDist) => {
+    resetPrevDist()
     context.clearRect(0, 0, canvas.width, canvas.height);
     traceStrokeInd.current = 0
     tracePointInd.current = 0
     setLetterInd(letterInd + 1)
 }
 
-const advancePoint = (tracePointIndRef, traceStrokeIndRef, transformedStrokes) => {
-    tracePointIndRef.current = tracePointIndRef.current + 1
-    if(tracePointIndRef.current >= transformedStrokes[traceStrokeIndRef.current].length) {
+const advancePoint = (tracePointIndRef, traceStrokeIndRef, transformedStrokes, resetPrevDist, betweenStrokes) => {
+    resetPrevDist()
+    betweenStrokes.current = false
+    tracePointIndRef.current += 1
+    if (tracePointIndRef.current >= transformedStrokes[traceStrokeIndRef.current].length) {
         tracePointIndRef.current = 0
-        traceStrokeIndRef.current = tracePointIndRef.current + 1
+        traceStrokeIndRef.current += 1
+        betweenStrokes.current = true
     }
 }
 
-const Level = ({ back }) => {
+const saveLetterAttrib = (performanceDataCurrent, letter, key, value) => {
+    performanceDataCurrent.letters[letter] = performanceDataCurrent.letters[letter] || {}
+    performanceDataCurrent.letters[letter][key] = value
+}
+
+const getLetterAttrib = (performanceDataCurrent, letter, key) => {
+    performanceDataCurrent.letters[letter] = performanceDataCurrent.letters[letter] || {}
+    return performanceDataCurrent.letters[letter][key]
+}
+
+const Level = ({ levelNum, completeLevel }) => {
     const [letterInd, setLetterInd] = useState(0);
     const [isDrawing, setIsDrawing] = useState(false);
+    const [reloadKey, setReloadKey] = useState(-1)
     const [transformedStrokes, setTransformedStrokes] = useState(null)
     const tracePointInd = useRef(null)
     const traceStrokeInd = useRef(null)
@@ -118,23 +98,46 @@ const Level = ({ back }) => {
     const letterHeight = useRef(null)
     const lastDrawnPoint = useRef({ x: 0, y: 0 });
     const prevD2ToPoint = useRef(null)
+    const betweenStrokes = useRef(null)
+    const performanceData = useRef({
+        time: new Date().getTime(),
+        letters: {}
+    })
+    const hasTracked = useRef(false)
+
+    const resetPrevDist = () => {
+        prevD2ToPoint.current = (letterHeight.current * 2) ** 2
+    }
 
     const loadImg = (event) => {
-        console.log("load image image");
+        console.log(performanceData.current);
+
+        if (!hasTracked.current) {
+            let curLetter = levels[levelNum].letters[letterInd]
+            let curNumMistakes = getLetterAttrib(performanceData.current, curLetter, 'numTries') || 0
+            saveLetterAttrib(performanceData.current, curLetter, 'numTries', curNumMistakes + 1)
+        }
+
+        hasTracked.current = true
+
+        document.getElementById('level').style.backgroundColor = colorByLetter[levels[levelNum].letters[letterInd]] || colorByLetter['default']
+        betweenStrokes.current = false
+
         const letterImg = event.target
-        const scaleFactor = window.innerHeight * .001
+        const scaleFactor = window.innerHeight * .0009
         imgScale.current = scaleFactor
-        console.log(letterImg.height, letterImg.naturalHeight);
         letterImg.height = scaleFactor * letterImg.naturalHeight
         letterHeight.current = letterImg.height
 
+        context.current.clearRect(0, 0, canvas.width, canvas.height);
 
-        let points = tracePoints[letters[letterInd]]
+        let letter = levels[levelNum].letters[letterInd]
+        let points = levels[levelNum].tracePoints[letter]
 
         let pointsScale = [letterImg.width / (points.dims[0]), letterImg.height / (points.dims[1])]
 
         const newTransformedStrokes = []
-        for(let inStroke of points.points){
+        for (let inStroke of points.points) {
             newTransformedStrokes.push(transformStroke(inStroke, [letterImg.width, letterImg.height], pointsScale))
         }
 
@@ -142,28 +145,53 @@ const Level = ({ back }) => {
 
         tracePointInd.current = 0
         traceStrokeInd.current = 0
-        prevD2ToPoint.current = (letterHeight.current * 2) ** 2
+        resetPrevDist()
     }
+
+    useEffect(() => {
+        if (letterInd >= levels[levelNum].letters.length) {
+            performanceData.current.time = new Date().getTime() - performanceData.current.time
+            completeLevel(performanceData.current)
+        }
+    }, [letterInd])
 
     useEffect(() => {
         const canvas = document.getElementById('canvas');
         const curContext = canvas.getContext('2d');
         context.current = curContext
 
-        drawNextPoint(curContext, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
+        drawTarget(curContext, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
 
         const rect = canvas.getBoundingClientRect()
 
         const handleTouchStart = (event) => {
-            setIsDrawing(true);
-  
+            hasTracked.current = false
+
             lastDrawnPoint.current = {
                 x: event.touches[0].clientX - rect.left,
                 y: event.touches[0].clientY - rect.top
             };
+
+            context.current.fillStyle = "black";
+            context.current.beginPath();
+            context.current.ellipse(lastDrawnPoint.current.x, lastDrawnPoint.current.y, DRAW_LINE_WIDTH / 2, DRAW_LINE_WIDTH / 2, 0, 0, Math.PI * 2);
+            context.current.fill();
+            let checkResult = checkDrawnPoint(prevD2ToPoint.current, transformedStrokes[traceStrokeInd.current][tracePointInd.current], lastDrawnPoint.current, imgScale.current)
+
+            if (checkResult.hit) {
+                advancePoint(tracePointInd, traceStrokeInd, transformedStrokes, resetPrevDist, betweenStrokes)
+                if (traceStrokeInd.current >= transformedStrokes.length) {
+                    advanceLetter(letterInd, setLetterInd, context.current, traceStrokeInd, tracePointInd, resetPrevDist)
+                }
+                else {
+                    drawTarget(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
+                }
+            }
+
+            setIsDrawing(true);
         };
 
-        const handleTouchMove = (event) => {
+        const handleTouchMove = async (event) => {
             if (!isDrawing) return;
 
             const x = event.touches[0].clientX - rect.left
@@ -173,32 +201,36 @@ const Level = ({ back }) => {
             context.current.moveTo(lastDrawnPoint.current.x, lastDrawnPoint.current.y);
             context.current.lineTo(x, y);
             context.current.strokeStyle = 'black';
-            context.current.lineWidth = 8;
+            context.current.lineWidth = DRAW_LINE_WIDTH;
             context.current.lineCap = 'round'
             context.current.stroke();
 
             lastDrawnPoint.current = ({ x, y });
 
-            if(tracePointInd.current + 1 < transformedStrokes[traceStrokeInd.current].length) {
-                let checkResult = checkDrawnPoint(prevD2ToPoint.current, transformedStrokes[traceStrokeInd.current][tracePointInd.current + 1], lastDrawnPoint.current, imgScale.current)
+            if (transformedStrokes[traceStrokeInd.current] && tracePointInd.current < transformedStrokes[traceStrokeInd.current].length) {
+                let checkResult = checkDrawnPoint(prevD2ToPoint.current, transformedStrokes[traceStrokeInd.current][tracePointInd.current], lastDrawnPoint.current, imgScale.current)
                 prevD2ToPoint.current = checkResult.dist
 
-                if(checkResult.hit) {
-                    prevD2ToPoint.current = (letterHeight.current * 2) ** 2
-                    drawNextPoint(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
-                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes)
-                    if(traceStrokeInd >= transformedStrokes[traceStrokeInd.current].length){
-                        advanceLetter(letterInd, setLetterInd, context.current)
-                    }   
+                if (isDrawing && !checkResult.good && !betweenStrokes.current) {
+                    setIsDrawing(false)
+                    document.getElementById('level').style.backgroundColor = '#E84855'
+                    await new Promise((resolve) => setTimeout(resolve, 0.5 * 1000))
+
+                    setReloadKey(Math.random())
+                } else if (checkResult.hit) {
+                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes, resetPrevDist, betweenStrokes)
+                    if (traceStrokeInd.current >= transformedStrokes.length) {
+                        advanceLetter(letterInd, setLetterInd, context.current, traceStrokeInd, tracePointInd, resetPrevDist)
+                    }
                     else {
-                        drawNextPoint(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
+                        drawTarget(context.current, tracePointInd.current, traceStrokeInd.current, transformedStrokes, imgScale.current)
                     }
                 }
             } else {
-                if(traceStrokeInd.current + 1 >= transformedStrokes.length) {
-                    advanceLetter(letterInd, setLetterInd, context.current, traceStrokeInd, tracePointInd)
+                if (traceStrokeInd.current >= transformedStrokes.length) {
+                    advanceLetter(letterInd, setLetterInd, context.current, traceStrokeInd, tracePointInd, resetPrevDist)
                 } else {
-                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes)
+                    advancePoint(tracePointInd, traceStrokeInd, transformedStrokes, resetPrevDist, betweenStrokes)
                 }
             }
         };
@@ -207,10 +239,10 @@ const Level = ({ back }) => {
             setIsDrawing(false);
         };
 
-        canvas.addEventListener('touchstart', handleTouchStart, {passive: true});
-        canvas.addEventListener('touchmove', handleTouchMove, {passive: true});
-        canvas.addEventListener('touchend', handleTouchEnd, {passive: true});
-        canvas.addEventListener('touchcancel', handleTouchEnd, {passive: true});
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: true });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: true });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: true });
+        canvas.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
         return () => {
             canvas.removeEventListener('touchstart', handleTouchStart);
@@ -221,14 +253,21 @@ const Level = ({ back }) => {
     }, [isDrawing, transformedStrokes]);
 
     return (
-        <div className="level">
-            <img className='centered-and-cropped' id='letterImage' src={`letters/${letters[letterInd]}.png`} onLoad={loadImg}/>
-            <canvas
-                id="canvas"
-                width={canvasWidth}
-                height={canvasHeight}
-                style={{ border: '1px solid black' }}
-            />
+        <div id='level' className="level">
+            <motion.div
+                key={levels[levelNum].letters[letterInd] + '-level-' + reloadKey}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+            >
+                <img className='centered-and-cropped' id='letterImage' src={`letters/${levels[levelNum].letters[letterInd]}.png`} onLoad={loadImg} />
+                <canvas
+                    id="canvas"
+                    width={canvasWidth}
+                    height={canvasHeight}
+                    style={{ border: '1px solid black' }}
+                />
+            </motion.div>
         </div>
     );
 };

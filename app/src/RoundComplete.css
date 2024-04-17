@@ -1,0 +1,9 @@
+.roundComplete {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    margin: auto;
+    align-items: center;
+    justify-content: center;
+}
